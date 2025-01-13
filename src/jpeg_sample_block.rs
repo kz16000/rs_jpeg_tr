@@ -2,6 +2,8 @@
 //  jpeg_sample_block.rs
 //
 //========================================================
+use crate::jpeg_frame_info;
+use crate::jpeg_frame_info::JPEG_MAX_NUM_OF_COMPONENTS;
 
 const JPEG_SAMPLE_BLOCK_SIZE: usize = 64;
 const JPEG_MCU_MAX_NUM_BLOCKS: usize = 6;
@@ -26,6 +28,7 @@ pub struct JpegMinimumCodedUnit
 {
     blocks: [JpegSampleBlock; JPEG_MCU_MAX_NUM_BLOCKS],
     dht_ids: [usize; JPEG_MCU_MAX_NUM_BLOCKS],
+    sampling_factor: [jpeg_frame_info::JpegSamplingFactor; JPEG_MAX_NUM_OF_COMPONENTS],
     index: usize,
     num_blocks_in_mcu: usize,
 }
@@ -87,35 +90,26 @@ impl JpegMinimumCodedUnit
         {
             blocks: [JpegSampleBlock::new(); JPEG_MCU_MAX_NUM_BLOCKS],
             dht_ids: [0; JPEG_MCU_MAX_NUM_BLOCKS],
+            sampling_factor: [jpeg_frame_info::JpegSamplingFactor::new(); JPEG_MAX_NUM_OF_COMPONENTS],
             index: 0,
             num_blocks_in_mcu: JPEG_MCU_MAX_NUM_BLOCKS,
         }
     }
 
-    fn set_mode_internal(&mut self, num_y_blocks: usize, num_c_blocks: usize)
+    pub fn set_mode(&mut self, fh: &jpeg_frame_info::JpegFrameHeaderInfo)
     {
-        self.num_blocks_in_mcu = num_y_blocks + num_c_blocks;
-        for i in 0..self.num_blocks_in_mcu
+        let mut i: usize = 0; 
+        for j in 0..fh.get_num_components()
         {
-            self.dht_ids[i] = if i >= num_y_blocks
+            self.sampling_factor[j] = fh.get_sampling_factor(j);
+            let num_blocks = self.sampling_factor[j].get_num_blocks();
+            for _k in 0..num_blocks
             {
-                1
-            }
-            else
-            {
-                0
+                self.dht_ids[i] = fh.get_table_id(j);
+                i += 1;
             }
         }
-    }
-
-    pub fn set_mode(&mut self, mode: JpegSampleMode)
-    {
-        match mode
-        {
-            JpegSampleMode::JpegModeYuv444 => self.set_mode_internal(1, 2),
-            JpegSampleMode::JpegModeYuv422 => self.set_mode_internal(2, 2),
-            JpegSampleMode::JpegModeYuv420 => self.set_mode_internal(4, 2),
-        }
+        self.num_blocks_in_mcu = i;
     }
 
     pub fn reset(&mut self)
@@ -158,7 +152,7 @@ impl JpegMinimumCodedUnit
     {
         for i in 0..self.num_blocks_in_mcu
         {
-            println!("Block {}:", i);
+            println!("Block {} (TableID={}):", i, self.dht_ids[i]);
             self.blocks[i].dump();
         }
     }

@@ -134,18 +134,20 @@ impl<'a> JpegReader<'a>
         return self.read_pos >= self.data_ref.get_size();
     }
 
-    pub fn read_u16be(&mut self) -> Option<u16>
+    pub fn read_u16be(&mut self) -> u16
     {
         let r = self.data_ref.read_u16be(self.read_pos);
+        assert!(r.is_some());
         self.read_pos += 2;
-        return r;
+        return r.unwrap();
     }
 
-    pub fn read_u8(&mut self) -> Option<u8>
+    pub fn read_u8(&mut self) -> u8
     {
         let r = self.data_ref.read_u8(self.read_pos);
+        assert!(r.is_some());
         self.read_pos += 1;
-        return r;
+        return r.unwrap();
     }
 }
 
@@ -204,6 +206,7 @@ impl<'a> JpegBitStreamReader<'a>
     {
         let r0 = self.data_ref.read_u16be(self.read_pos);
         let r1 = self.data_ref.read_u8(self.read_pos + 2);
+        assert!(r1.is_some());
         let mut b0 = r0.unwrap();
         let mut b1 = r1.unwrap();
         //println!("{:016b}", b0);

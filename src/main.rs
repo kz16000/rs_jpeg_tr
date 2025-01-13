@@ -7,6 +7,7 @@ use std::env;
 mod jpeg_raw_data;
 mod jpeg_sample_block;
 mod jpeg_huffman_table;
+mod jpeg_frame_info;
 mod jpeg_control;
 
 fn main() 

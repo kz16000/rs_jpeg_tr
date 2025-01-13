@@ -2,18 +2,21 @@
 //  jpeg_huffman_table.rs
 //
 //========================================================
-use crate::jpeg_raw_data;
-use crate::jpeg_sample_block;
+use crate::jpeg_raw_data::JpegReader;
+use crate::jpeg_raw_data::JpegBitStreamReader;
+use crate::jpeg_sample_block::JpegMinimumCodedUnit;
 
 const JPEG_NUM_DHT_TREE_BITS: usize = 16;
+const JPEG_DHT_LOG_DETAIL: u8 = 0x01;
 
 struct JpegHuffmanTable
 {
-    table_id: u8,
     tree: [u8; JPEG_NUM_DHT_TREE_BITS],
     encoding: Vec<u8>,
     bit_pattern: Vec<u16>,
     bit_length: Vec<u8>,
+    table_id: u8,
+    log_control: u8,
 }
 
 pub struct JpegDhtManager
@@ -30,33 +33,28 @@ impl JpegHuffmanTable
     {
         JpegHuffmanTable
         {
-            table_id: 0,
             tree: [0; JPEG_NUM_DHT_TREE_BITS],
             encoding: Vec::new(),
             bit_pattern: Vec::new(),
             bit_length:Vec::new(),
+            table_id: 0,
+            log_control: 0,
         }
     }
 
     // セグメント内容の parse と読み込み
-    fn parse_segment(&mut self, reader: &mut jpeg_raw_data::JpegReader)
+    fn parse_segment(&mut self, reader: &mut JpegReader)
     {
         // Segment size
-        let s = reader.read_u16be();
-        assert!(s.is_some());
-        let seg_size = s.unwrap();
+        let seg_size = reader.read_u16be();
 
         // Table ID, AD/DC flag
-        let r = reader.read_u8();
-        assert!(r.is_some());
-        self.table_id = r.unwrap();
+        self.table_id = reader.read_u8();
 
         // Huffman tree info
         for i in 0..JPEG_NUM_DHT_TREE_BITS
         {
-            let r = reader.read_u8();
-            assert!(r.is_some());
-            self.tree[i] = r.unwrap();
+            self.tree[i] = reader.read_u8();
         }
 
         // Encoding info
@@ -64,9 +62,7 @@ impl JpegHuffmanTable
         self.encoding = Vec::<u8>::with_capacity(encoding_size);
         for _i in 0..encoding_size
         {
-            let r = reader.read_u8();
-            assert!(r.is_some());
-            let e = r.unwrap();
+            let e = reader.read_u8();
             self.encoding.push(e);
         }
 
@@ -74,6 +70,18 @@ impl JpegHuffmanTable
         self.bit_pattern = Vec::<u16>::with_capacity(encoding_size);
         self.bit_length = Vec::<u8>::with_capacity(encoding_size);
         self.create_bit_pattern();
+    }
+
+    // Log control
+    fn is_log_enabled(&self, flag: u8) -> bool
+    {
+        self.log_control & flag != 0
+    }
+
+    // Set log control
+    fn set_log_control(&mut self, flag: u8)
+    {
+        self.log_control = flag;
     }
 
     // 参照用ビットパターンの展開
@@ -110,7 +118,7 @@ impl JpegHuffmanTable
     }
 
     // ビット列 Decode (DC)
-    fn decode_dc(&self, bsreader: &mut jpeg_raw_data::JpegBitStreamReader) -> i16
+    fn decode_dc(&self, bsreader: &mut JpegBitStreamReader) -> i16
     {
         let bh = bsreader.read_bits16();
         let mut n_bits_huff: u8 = 0;
@@ -121,8 +129,11 @@ impl JpegHuffmanTable
             {
                 n_bits_ssss = self.encoding[i - 1];
                 n_bits_huff = self.bit_length[i - 1];
-                println!("DC: Match {} @ {:016b} {:016b} {} -> {}",
-                        i, bh, self.bit_pattern[i-1], n_bits_huff, n_bits_ssss);
+                if self.is_log_enabled(JPEG_DHT_LOG_DETAIL)
+                {
+                    println!("DC: Match {} @ {:016b} {:016b} {} -> {}",
+                            i, bh, self.bit_pattern[i-1], n_bits_huff, n_bits_ssss);
+                }
                 break;
             }
         }
@@ -136,12 +147,15 @@ impl JpegHuffmanTable
             bsreader.move_bitpos(n_bits_ssss as isize);
             dc_diff = self.unpack_coefficient(n_bits_ssss, bs);
         }
-        println!("SSSS Unpacked data: {:016b} @ {} -> {}", bs, n_bits_ssss, dc_diff);
+        if self.is_log_enabled(JPEG_DHT_LOG_DETAIL)
+        {
+            println!("SSSS Unpacked data: {:016b} @ {} -> {}", bs, n_bits_ssss, dc_diff);
+        }
         dc_diff
     }
 
     // ビット列 Decode (AC)
-    fn decode_ac(&self, bsreader: &mut jpeg_raw_data::JpegBitStreamReader) -> (i16, usize)
+    fn decode_ac(&self, bsreader: &mut JpegBitStreamReader) -> (i16, usize)
     {
         let bh = bsreader.read_bits16();
         let mut n_bits_huff: u8 = 0;
@@ -162,8 +176,11 @@ impl JpegHuffmanTable
                 };
                 n_bits_ssss = n_bits_ssss & 0xF;    // lower 4bit
                 n_bits_huff = self.bit_length[i - 1];
-                println!("AC: Match {} @ {:016b} {:016b} {} -> {}",
-                        i, bh, self.bit_pattern[i-1], n_bits_huff, n_bits_ssss);
+                if self.is_log_enabled(JPEG_DHT_LOG_DETAIL)
+                {
+                    println!("AC: Match {} @ {:016b} {:016b} {} -> {}",
+                            i, bh, self.bit_pattern[i-1], n_bits_huff, n_bits_ssss);
+                }
                 break;
             }
         }
@@ -177,8 +194,11 @@ impl JpegHuffmanTable
             bsreader.move_bitpos(n_bits_ssss as isize);
             dc_diff = self.unpack_coefficient(n_bits_ssss, bs);
         }
-        println!("Zero run-length: {}", n_zero_run);
-        println!("SSSS Unpacked data: {:016b} @ {} -> {}", bs, n_bits_ssss, dc_diff);
+        if self.is_log_enabled(JPEG_DHT_LOG_DETAIL)
+        {
+            println!("Zero run-length: {}", n_zero_run);
+            println!("SSSS Unpacked data: {:016b} @ {} -> {}", bs, n_bits_ssss, dc_diff);
+        }
         (dc_diff, n_zero_run as usize)
     }
 
@@ -225,16 +245,14 @@ impl JpegDhtManager
     }
 
     // セグメント内容の parse と読み込み
-    pub fn parse_segment(&mut self, reader: &mut jpeg_raw_data::JpegReader)
+    pub fn parse_segment(&mut self, reader: &mut JpegReader)
     {
         // どのテーブルを使用するかのため ID を先読み
-        let r = reader.read_u8();
-        assert!(r.is_some());
-        let id = r.unwrap();
+        let id = reader.read_u8();
         // 一旦セクションの先頭に巻き戻し
         reader.move_pos(-3);
  
-        let idx = (id & 0x01) as usize;
+        let idx = (id & 0x03) as usize;
         if id & 0x10 == 0
         {
            self.dc[idx].parse_segment(reader);
@@ -246,10 +264,8 @@ impl JpegDhtManager
     }
     
     // Decode
-    pub fn decode(&self, bsreader: &mut jpeg_raw_data::JpegBitStreamReader)
+    pub fn decode(&self, bsreader: &mut JpegBitStreamReader, mcu: &mut JpegMinimumCodedUnit)
     {
-        let mut mcu = jpeg_sample_block::JpegMinimumCodedUnit::new();
-        mcu.set_mode(jpeg_sample_block::JpegSampleMode::JpegModeYuv420);
         mcu.reset();
 
         while !mcu.is_completed()
@@ -265,6 +281,15 @@ impl JpegDhtManager
             }
         }
         mcu.dump();
+    }
+
+    // Set log control
+    fn set_log_control(&mut self, flag: u8)
+    {
+        self.dc[0].set_log_control(flag);
+        self.dc[1].set_log_control(flag);
+        self.ac[0].set_log_control(flag);
+        self.ac[1].set_log_control(flag);
     }
 
     // 読み込み済の全 DHT テーブルのダンプ

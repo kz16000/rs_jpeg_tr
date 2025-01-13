@@ -3,6 +3,8 @@
 //
 //========================================================
 use crate::jpeg_raw_data;
+use crate::jpeg_frame_info;
+use crate::jpeg_sample_block;
 use crate::jpeg_huffman_table;
 
 #[allow(dead_code)]
@@ -21,6 +23,7 @@ enum JpegMarker
 pub struct JpegControl
 {
     rawdata: jpeg_raw_data::JpegRawData,
+    frame_header_info: jpeg_frame_info::JpegFrameHeaderInfo,
     dht_mgr: jpeg_huffman_table::JpegDhtManager,
     img_start: usize,
 }
@@ -34,6 +37,7 @@ impl JpegControl
         JpegControl
         {
             rawdata: jpeg_raw_data::JpegRawData::new(),
+            frame_header_info: jpeg_frame_info::JpegFrameHeaderInfo::new(),
             dht_mgr: jpeg_huffman_table::JpegDhtManager::new(),
             img_start: 0,
         }
@@ -54,9 +58,7 @@ impl JpegControl
         {
             let seg_size: usize;
             let marker_name: &'static str;
-            let r = reader.read_u16be();
-            assert!(r.is_some());
-            let m = r.unwrap();
+            let m = reader.read_u16be();
             if m == JpegMarker::SOI as u16
             {
                 seg_size = 0;
@@ -69,14 +71,11 @@ impl JpegControl
             }
             else
             {
-                let s = reader.read_u16be();
-                assert!(s.is_some());
-                seg_size = s.unwrap() as usize;
+                seg_size = reader.read_u16be() as usize;
+                let mut reader2 = reader.copy();
                 if m == JpegMarker::DHT as u16
                 {
                     marker_name = "DHT ";
-                    // JpegReader インスタンスを複製
-                    let mut reader2 = reader.copy();
                     self.dht_mgr.parse_segment(&mut reader2);
                 }
                 else if m == JpegMarker::DQT as u16
@@ -86,6 +85,7 @@ impl JpegControl
                 else if m == JpegMarker::SOF0 as u16
                 {
                     marker_name = "SOF0";
+                    self.frame_header_info.parse_segment(&mut reader2);
                 }
                 else if m == JpegMarker::APP0 as u16
                 {
@@ -109,11 +109,15 @@ impl JpegControl
             print!("{} {:04x} \n", marker_name, seg_size);
         }
         
+        self.frame_header_info.dump();
         //self.dht_mgr.dump();
 
         let mut bsreader = jpeg_raw_data::JpegBitStreamReader::new(&mut self.rawdata);
+        let mut mcu = jpeg_sample_block::JpegMinimumCodedUnit::new();
+        mcu.set_mode(&self.frame_header_info);
+
         bsreader.set_pos(self.img_start, 0);
-        self.dht_mgr.decode(&mut bsreader);
+        self.dht_mgr.decode(&mut bsreader, &mut mcu);
     }
 }
 
