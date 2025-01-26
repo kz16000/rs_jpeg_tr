@@ -5,6 +5,7 @@
 use crate::jpeg_raw_data::JpegReader;
 use crate::jpeg_raw_data::JpegBitStreamReader;
 use crate::jpeg_sample_block::JpegMinimumCodedUnit;
+use crate::jpeg_frame_info::JPEG_MAX_NUM_OF_COMPONENTS;
 
 const JPEG_NUM_DHT_TREE_BITS: usize = 16;
 const JPEG_DHT_LOG_DETAIL: u8 = 0x01;
@@ -19,10 +20,12 @@ struct JpegHuffmanTable
     log_control: u8,
 }
 
+#[allow(dead_code)]
 pub struct JpegDhtManager
 {
     dc: [JpegHuffmanTable; 2],
     ac: [JpegHuffmanTable; 2],
+    previous_dc: [i16; JPEG_MAX_NUM_OF_COMPONENTS],
 }
 
 #[allow(dead_code)]
@@ -241,6 +244,7 @@ impl JpegDhtManager
         {
             ac: [JpegHuffmanTable::new(), JpegHuffmanTable::new()],
             dc: [JpegHuffmanTable::new(), JpegHuffmanTable::new()],
+            previous_dc: [0; JPEG_MAX_NUM_OF_COMPONENTS],
         }
     }
 
@@ -270,8 +274,9 @@ impl JpegDhtManager
 
         while !mcu.is_completed()
         {
-            let table_id = mcu.get_current_dht_id();
+            let table_id = mcu.get_current_table_id();
             let dc_decoded = self.dc[table_id].decode_dc(bsreader);
+            // TODO: Add previous DC value
             mcu.add_coefficients(dc_decoded, 0);
             let mut is_end = false;
             while !is_end
@@ -280,7 +285,6 @@ impl JpegDhtManager
                 is_end = mcu.add_coefficients(ac_decoded.0, ac_decoded.1);
             }
         }
-        mcu.dump();
     }
 
     // Set log control

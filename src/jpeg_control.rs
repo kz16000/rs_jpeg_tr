@@ -6,6 +6,7 @@ use crate::jpeg_raw_data;
 use crate::jpeg_frame_info;
 use crate::jpeg_sample_block;
 use crate::jpeg_huffman_table;
+use crate::jpeg_quantization_table;
 
 #[allow(dead_code)]
 enum JpegMarker
@@ -25,6 +26,7 @@ pub struct JpegControl
     rawdata: jpeg_raw_data::JpegRawData,
     frame_header_info: jpeg_frame_info::JpegFrameHeaderInfo,
     dht_mgr: jpeg_huffman_table::JpegDhtManager,
+    dqt_mgr: jpeg_quantization_table::JpegDqtManager,
     img_start: usize,
 }
 
@@ -39,6 +41,7 @@ impl JpegControl
             rawdata: jpeg_raw_data::JpegRawData::new(),
             frame_header_info: jpeg_frame_info::JpegFrameHeaderInfo::new(),
             dht_mgr: jpeg_huffman_table::JpegDhtManager::new(),
+            dqt_mgr: jpeg_quantization_table::JpegDqtManager::new(),
             img_start: 0,
         }
     }
@@ -81,6 +84,7 @@ impl JpegControl
                 else if m == JpegMarker::DQT as u16
                 {
                     marker_name = "DQT ";
+                    self.dqt_mgr.read_table(&mut reader2);
                 }
                 else if m == JpegMarker::SOF0 as u16
                 {
@@ -109,15 +113,24 @@ impl JpegControl
             print!("{} {:04x} \n", marker_name, seg_size);
         }
         
-        self.frame_header_info.dump();
-        //self.dht_mgr.dump();
+        /*
+        self.frame_header_info.dump();       
+        self.dht_mgr.dump();
+        self.dqt_mgr.dump();
+        */
+    }
 
+    // Decoding image
+    pub fn decode_image(&mut self)
+    {
         let mut bsreader = jpeg_raw_data::JpegBitStreamReader::new(&mut self.rawdata);
         let mut mcu = jpeg_sample_block::JpegMinimumCodedUnit::new();
         mcu.set_mode(&self.frame_header_info);
 
         bsreader.set_pos(self.img_start, 0);
         self.dht_mgr.decode(&mut bsreader, &mut mcu);
+        self.dqt_mgr.dequantize(&mut mcu);
+        mcu.dump();
     }
 }
 
