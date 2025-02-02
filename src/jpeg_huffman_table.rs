@@ -4,7 +4,6 @@
 //========================================================
 use crate::jpeg_raw_data::JpegReader;
 use crate::jpeg_raw_data::JpegBitStreamReader;
-use crate::jpeg_sample_block::JpegMinimumCodedUnit;
 use crate::jpeg_frame_info::JPEG_MAX_NUM_OF_COMPONENTS;
 
 const JPEG_NUM_DHT_TREE_BITS: usize = 16;
@@ -268,22 +267,14 @@ impl JpegDhtManager
     }
     
     // Decode
-    pub fn decode(&self, bsreader: &mut JpegBitStreamReader, mcu: &mut JpegMinimumCodedUnit)
+    pub fn decode_dc(&self, table_id: usize, bsreader: &mut JpegBitStreamReader) -> i16
     {
-        mcu.reset();
+        self.dc[table_id].decode_dc(bsreader)
+    }
 
-        while !mcu.is_completed()
-        {
-            let table_id = mcu.get_current_table_id();
-            let dc_decoded = self.dc[table_id].decode_dc(bsreader);
-            mcu.add_coefficients_dc(dc_decoded);
-            let mut is_end = false;
-            while !is_end
-            {
-                let ac_decoded = self.ac[table_id].decode_ac(bsreader);
-                is_end = mcu.add_coefficients(ac_decoded.0, ac_decoded.1);
-            }
-        }
+    pub fn decode_ac(&self, table_id: usize, bsreader: &mut JpegBitStreamReader) -> (i16, usize)
+    {
+        self.ac[table_id].decode_ac(bsreader)
     }
 
     // Set log control

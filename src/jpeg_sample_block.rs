@@ -3,7 +3,9 @@
 //
 //========================================================
 use crate::jpeg_frame_info;
+use crate::jpeg_raw_data::JpegBitStreamReader;
 use crate::jpeg_frame_info::JPEG_MAX_NUM_OF_COMPONENTS;
+use crate::jpeg_huffman_table::JpegDhtManager;
 use crate::jpeg_quantization_table::JpegDqtManager;
 
 pub const JPEG_SAMPLE_BLOCK_SIZE: usize = 64;
@@ -148,25 +150,7 @@ impl JpegMinimumCodedUnit
         }
     }
 
-    // Sets MCU mode via component sampling information
-    pub fn set_mode(&mut self, fh: &jpeg_frame_info::JpegFrameHeaderInfo)
-    {
-        let mut i: usize = 0; 
-        for j in 0..fh.get_num_components()
-        {
-            self.sampling_factor[j] = fh.get_sampling_factor(j);
-            self.dht_ids[j] = fh.get_table_id(j) as u8;
-            let num_blocks = self.sampling_factor[j].get_num_blocks();
-            for _k in 0..num_blocks
-            {
-                self.component_ids[i] = j as u8;
-                i += 1;
-            }
-        }
-        self.num_blocks_in_mcu = i;
-    }
-
-    pub fn reset(&mut self)
+    fn reset(&mut self)
     {
         self.index = 0;
         for i in 0..JPEG_MCU_MAX_NUM_BLOCKS
@@ -175,23 +159,18 @@ impl JpegMinimumCodedUnit
         }
     }
 
-    pub fn get_current_component_id(&self) -> usize
+    fn get_current_component_id(&self) -> usize
     {
         self.component_ids[self.index] as usize
     }
 
-    pub fn get_current_table_id(&self) -> usize
+    fn get_current_table_id(&self) -> usize
     {
         self.dht_ids[self.get_current_component_id()] as usize
     }
 
-    pub fn is_completed(&self) -> bool
-    {
-        self.index >= self.num_blocks_in_mcu
-    }
-
     // Add coefficients from huffman-decoded stream
-    pub fn add_coefficients(&mut self, coef: i16, num_zero_run: usize) -> bool
+    fn add_coefficients(&mut self, coef: i16, num_zero_run: usize) -> bool
     {
         if self.index < self.num_blocks_in_mcu
         {
@@ -209,13 +188,32 @@ impl JpegMinimumCodedUnit
     }
 
     // Add coefficients from huffman-decoded stream (for DC coefficient)
-    pub fn add_coefficients_dc(&mut self, coef: i16) -> bool
+    fn add_coefficients_dc(&mut self, coef: i16) -> bool
     {
         // DC value is an offset from the last one.
         let cid = self.get_current_component_id();
         let coef1 = coef + self.last_dc[cid];
         self.last_dc[cid] = coef1;
         self.add_coefficients(coef1, 0)
+    }
+
+    // Fill coeffieients through an Huffman-encoded bitstream
+    pub fn fill_coefficients(&mut self, dht: &JpegDhtManager, bsreader: &mut JpegBitStreamReader)
+    {
+        self.reset();
+
+        while self.index < self.num_blocks_in_mcu
+        {
+            let table_id = self.get_current_table_id();
+            let dc_decoded = dht.decode_dc(table_id, bsreader);
+            self.add_coefficients_dc(dc_decoded);
+            let mut is_end = false;
+            while !is_end
+            {
+                let ac_decoded = dht.decode_ac(table_id, bsreader);
+                is_end = self.add_coefficients(ac_decoded.0, ac_decoded.1);
+            }
+        }
     }
 
     // Scale coefficients for dequantization
@@ -229,6 +227,24 @@ impl JpegMinimumCodedUnit
             self.blocks[self.index].scale_coefficients(dqt.get_qt_slice(table_id));
             self.index += 1;
         }
+    }
+
+    // Sets MCU mode via component sampling information
+    pub fn set_mode(&mut self, fh: &jpeg_frame_info::JpegFrameHeaderInfo)
+    {
+        let mut i: usize = 0; 
+        for j in 0..fh.get_num_components()
+        {
+            self.sampling_factor[j] = fh.get_sampling_factor(j);
+            self.dht_ids[j] = fh.get_table_id(j) as u8;
+            let num_blocks = self.sampling_factor[j].get_num_blocks();
+            for _k in 0..num_blocks
+            {
+                self.component_ids[i] = j as u8;
+                i += 1;
+            }
+        }
+        self.num_blocks_in_mcu = i;
     }
 
     pub fn dump(&self)

@@ -1,11 +1,10 @@
 //========================================================
-//  jpeg_huffman_table.rs
+//  jpeg_quantization_table.rs
 //
 //========================================================
 use crate::jpeg_raw_data::JpegReader;
 use crate::jpeg_sample_block::JPEG_SAMPLE_BLOCK_SIZE;
 use crate::jpeg_sample_block::REV_ZIGZAG_TABLE;
-//use crate::jpeg_sample_block::JpegMinimumCodedUnit;
 
 const JPEG_NUM_DQT: usize = 4;
 
