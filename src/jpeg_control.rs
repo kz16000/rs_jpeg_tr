@@ -129,7 +129,7 @@ impl JpegControl
 
         bsreader.set_pos(self.img_start, 0);
         self.dht_mgr.decode(&mut bsreader, &mut mcu);
-        self.dqt_mgr.dequantize(&mut mcu);
+        mcu.dequantize(&self.dqt_mgr);
         mcu.dump();
     }
 }

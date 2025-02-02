@@ -4,6 +4,7 @@
 //========================================================
 use crate::jpeg_frame_info;
 use crate::jpeg_frame_info::JPEG_MAX_NUM_OF_COMPONENTS;
+use crate::jpeg_quantization_table::JpegDqtManager;
 
 pub const JPEG_SAMPLE_BLOCK_SIZE: usize = 64;
 const JPEG_MCU_MAX_NUM_BLOCKS: usize = 6;
@@ -31,10 +32,10 @@ const ZIGZAG_TABLE: [u8; JPEG_SAMPLE_BLOCK_SIZE] =
      9, 11, 18, 24, 31, 40, 44, 53,
      10, 19, 23, 32, 39, 45, 52, 54,
      20, 22, 33, 38, 46, 51, 55, 60,
-        21, 34, 37, 47, 50, 56, 59, 61,
-        35, 36, 48, 49, 57, 58, 62, 63,
-    ];
-    */
+     21, 34, 37, 47, 50, 56, 59, 61,
+     35, 36, 48, 49, 57, 58, 62, 63,
+];
+*/
 
 
 #[allow(dead_code)]
@@ -56,8 +57,10 @@ struct JpegSampleBlock
 pub struct JpegMinimumCodedUnit
 {
     blocks: [JpegSampleBlock; JPEG_MCU_MAX_NUM_BLOCKS],
-    dht_ids: [usize; JPEG_MCU_MAX_NUM_BLOCKS],
+    component_ids: [u8; JPEG_MCU_MAX_NUM_BLOCKS],
+    dht_ids: [u8; JPEG_MAX_NUM_OF_COMPONENTS],
     sampling_factor: [jpeg_frame_info::JpegSamplingFactor; JPEG_MAX_NUM_OF_COMPONENTS],
+    last_dc: [i16; JPEG_MAX_NUM_OF_COMPONENTS],
     index: usize,
     num_blocks_in_mcu: usize,
 }
@@ -117,7 +120,7 @@ impl JpegSampleBlock
     {
         for i in 0..JPEG_SAMPLE_BLOCK_SIZE
         {
-            print!("{:3} ", self.sample[i]);
+            print!("{:4} ", self.sample[i]);
             if i % 8 == 7
             {
                 println!();
@@ -136,23 +139,27 @@ impl JpegMinimumCodedUnit
         JpegMinimumCodedUnit
         {
             blocks: [JpegSampleBlock::new(); JPEG_MCU_MAX_NUM_BLOCKS],
-            dht_ids: [0; JPEG_MCU_MAX_NUM_BLOCKS],
+            component_ids: [0; JPEG_MCU_MAX_NUM_BLOCKS],
+            dht_ids: [0; JPEG_MAX_NUM_OF_COMPONENTS],
             sampling_factor: [jpeg_frame_info::JpegSamplingFactor::new(); JPEG_MAX_NUM_OF_COMPONENTS],
+            last_dc: [0; JPEG_MAX_NUM_OF_COMPONENTS],
             index: 0,
             num_blocks_in_mcu: JPEG_MCU_MAX_NUM_BLOCKS,
         }
     }
 
+    // Sets MCU mode via component sampling information
     pub fn set_mode(&mut self, fh: &jpeg_frame_info::JpegFrameHeaderInfo)
     {
         let mut i: usize = 0; 
         for j in 0..fh.get_num_components()
         {
             self.sampling_factor[j] = fh.get_sampling_factor(j);
+            self.dht_ids[j] = fh.get_table_id(j) as u8;
             let num_blocks = self.sampling_factor[j].get_num_blocks();
             for _k in 0..num_blocks
             {
-                self.dht_ids[i] = fh.get_table_id(j);
+                self.component_ids[i] = j as u8;
                 i += 1;
             }
         }
@@ -168,9 +175,14 @@ impl JpegMinimumCodedUnit
         }
     }
 
+    pub fn get_current_component_id(&self) -> usize
+    {
+        self.component_ids[self.index] as usize
+    }
+
     pub fn get_current_table_id(&self) -> usize
     {
-        self.dht_ids[self.index]
+        self.dht_ids[self.get_current_component_id()] as usize
     }
 
     pub fn is_completed(&self) -> bool
@@ -196,22 +208,35 @@ impl JpegMinimumCodedUnit
         }
     }
 
-    // Scale coefficients for dequantization
-    pub fn scale_coefficients(&mut self, scale: &[u16]) -> bool
+    // Add coefficients from huffman-decoded stream (for DC coefficient)
+    pub fn add_coefficients_dc(&mut self, coef: i16) -> bool
     {
-        if self.index < self.num_blocks_in_mcu
+        // DC value is an offset from the last one.
+        let cid = self.get_current_component_id();
+        let coef1 = coef + self.last_dc[cid];
+        self.last_dc[cid] = coef1;
+        self.add_coefficients(coef1, 0)
+    }
+
+    // Scale coefficients for dequantization
+    pub fn dequantize(&mut self, dqt: &JpegDqtManager)
+    {
+        self.reset();
+
+        while self.index < self.num_blocks_in_mcu
         {
-            self.blocks[self.index].scale_coefficients(scale);
+            let table_id = self.get_current_table_id();
+            self.blocks[self.index].scale_coefficients(dqt.get_qt_slice(table_id));
             self.index += 1;
         }
-        self.index >= self.num_blocks_in_mcu
     }
 
     pub fn dump(&self)
     {
         for i in 0..self.num_blocks_in_mcu
         {
-            println!("Block {} (TableID={}):", i, self.dht_ids[i]);
+            let cid = self.component_ids[i] as usize;
+            println!("Block {} (ComponentID={}, TableID={}):", i, cid, self.dht_ids[cid]);
             self.blocks[i].dump();
         }
     }

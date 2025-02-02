@@ -5,7 +5,7 @@
 use crate::jpeg_raw_data::JpegReader;
 use crate::jpeg_sample_block::JPEG_SAMPLE_BLOCK_SIZE;
 use crate::jpeg_sample_block::REV_ZIGZAG_TABLE;
-use crate::jpeg_sample_block::JpegMinimumCodedUnit;
+//use crate::jpeg_sample_block::JpegMinimumCodedUnit;
 
 const JPEG_NUM_DQT: usize = 4;
 
@@ -87,17 +87,10 @@ impl JpegDqtManager
         self.qt[idx].read_table(reader);
     }
 
-    // Dequantize
-    pub fn dequantize(&self, mcu: &mut JpegMinimumCodedUnit)
+    // Get quantization table as a slice
+    pub fn get_qt_slice(&self, table_id: usize) -> &[u16]
     {
-        mcu.reset();
-
-        let mut is_completed = false;
-        while !is_completed
-        {
-            let table_id = mcu.get_current_table_id();
-            is_completed = mcu.scale_coefficients(self.qt[table_id].get_slice());
-        }
+        self.qt[table_id].get_slice()
     }
 
     // 全 DQT テーブルのダンプ

@@ -276,8 +276,7 @@ impl JpegDhtManager
         {
             let table_id = mcu.get_current_table_id();
             let dc_decoded = self.dc[table_id].decode_dc(bsreader);
-            // TODO: Add previous DC value
-            mcu.add_coefficients(dc_decoded, 0);
+            mcu.add_coefficients_dc(dc_decoded);
             let mut is_end = false;
             while !is_end
             {
