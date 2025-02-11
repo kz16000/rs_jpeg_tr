@@ -4,10 +4,12 @@
 //========================================================
 use std::env;
 
+mod jpeg_constants;
 mod jpeg_raw_data;
 mod jpeg_sample_block;
 mod jpeg_huffman_table;
 mod jpeg_quantization_table;
+mod jpeg_idct;
 mod jpeg_frame_info;
 mod jpeg_control;
 

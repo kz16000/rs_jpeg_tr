@@ -127,9 +127,13 @@ impl JpegControl
         let mut mcu = jpeg_sample_block::JpegMinimumCodedUnit::new();
         mcu.set_mode(&self.frame_header_info);
 
+        //self.dht_mgr.set_log_control(0xFF);
+
         bsreader.set_pos(self.img_start, 0);
         mcu.fill_coefficients(&self.dht_mgr, &mut bsreader);
         mcu.dequantize(&self.dqt_mgr);
+        mcu.dump();
+        mcu.transform();
         mcu.dump();
     }
 }

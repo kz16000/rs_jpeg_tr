@@ -2,9 +2,9 @@
 //  jpeg_huffman_table.rs
 //
 //========================================================
+use crate::jpeg_constants::JPEG_MAX_NUM_OF_COMPONENTS;
 use crate::jpeg_raw_data::JpegReader;
 use crate::jpeg_raw_data::JpegBitStreamReader;
-use crate::jpeg_frame_info::JPEG_MAX_NUM_OF_COMPONENTS;
 
 const JPEG_NUM_DHT_TREE_BITS: usize = 16;
 const JPEG_DHT_LOG_DETAIL: u8 = 0x01;
@@ -151,7 +151,7 @@ impl JpegHuffmanTable
         }
         if self.is_log_enabled(JPEG_DHT_LOG_DETAIL)
         {
-            println!("SSSS Unpacked data: {:016b} @ {} -> {}", bs, n_bits_ssss, dc_diff);
+            println!("SSSS Unpacked data: {:016b} @ {} -> [{}]", bs, n_bits_ssss, dc_diff);
         }
         dc_diff
     }
@@ -199,7 +199,7 @@ impl JpegHuffmanTable
         if self.is_log_enabled(JPEG_DHT_LOG_DETAIL)
         {
             println!("Zero run-length: {}", n_zero_run);
-            println!("SSSS Unpacked data: {:016b} @ {} -> {}", bs, n_bits_ssss, dc_diff);
+            println!("SSSS Unpacked data: {:016b} @ {} -> [{}]", bs, n_bits_ssss, dc_diff);
         }
         (dc_diff, n_zero_run as usize)
     }
@@ -278,7 +278,7 @@ impl JpegDhtManager
     }
 
     // Set log control
-    fn set_log_control(&mut self, flag: u8)
+    pub fn set_log_control(&mut self, flag: u8)
     {
         self.dc[0].set_log_control(flag);
         self.dc[1].set_log_control(flag);

@@ -2,9 +2,8 @@
 //  jpeg_frame_info.rs
 //
 //========================================================
+use crate::jpeg_constants::JPEG_MAX_NUM_OF_COMPONENTS;
 use crate::jpeg_raw_data;
-
-pub const JPEG_MAX_NUM_OF_COMPONENTS: usize = 4;
 
 #[derive(Copy)]
 #[derive(Clone)]

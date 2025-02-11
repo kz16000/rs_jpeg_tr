@@ -2,9 +2,9 @@
 //  jpeg_quantization_table.rs
 //
 //========================================================
+use crate::jpeg_constants::JPEG_SAMPLE_BLOCK_SIZE;
+use crate::jpeg_constants::JPEG_REV_ZIGZAG_TABLE;
 use crate::jpeg_raw_data::JpegReader;
-use crate::jpeg_sample_block::JPEG_SAMPLE_BLOCK_SIZE;
-use crate::jpeg_sample_block::REV_ZIGZAG_TABLE;
 
 const JPEG_NUM_DQT: usize = 4;
 
@@ -38,7 +38,7 @@ impl JpegQuantizationTable
         // Quantization table info
         for i in 0..JPEG_SAMPLE_BLOCK_SIZE
         {
-            self.sample[REV_ZIGZAG_TABLE[i] as usize] = reader.read_u8() as u16;
+            self.sample[JPEG_REV_ZIGZAG_TABLE[i] as usize] = reader.read_u8() as u16;
         }       
     }
 
