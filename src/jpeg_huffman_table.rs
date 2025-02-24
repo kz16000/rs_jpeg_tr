@@ -139,14 +139,14 @@ impl JpegHuffmanTable
                 break;
             }
         }
-        bsreader.move_bitpos(n_bits_huff as isize);
+        bsreader.move_bitpos(n_bits_huff as usize);
         let mut bs: u16 = 0;
         let mut dc_diff: i16 = 0;
         // DC coding table conversion
         if n_bits_ssss > 0
         {
             bs = bsreader.read_bits16();
-            bsreader.move_bitpos(n_bits_ssss as isize);
+            bsreader.move_bitpos(n_bits_ssss as usize);
             dc_diff = self.unpack_coefficient(n_bits_ssss, bs);
         }
         if self.is_log_enabled(JPEG_DHT_LOG_DETAIL)
@@ -186,14 +186,14 @@ impl JpegHuffmanTable
                 break;
             }
         }
-        bsreader.move_bitpos(n_bits_huff as isize);
+        bsreader.move_bitpos(n_bits_huff as usize);
         let mut bs: u16 = 0;
         let mut dc_diff: i16 = 0;
         // AC coding table conversion
         if n_bits_ssss > 0
         {
             bs = bsreader.read_bits16();
-            bsreader.move_bitpos(n_bits_ssss as isize);
+            bsreader.move_bitpos(n_bits_ssss as usize);
             dc_diff = self.unpack_coefficient(n_bits_ssss, bs);
         }
         if self.is_log_enabled(JPEG_DHT_LOG_DETAIL)

@@ -22,6 +22,7 @@ pub struct JpegBitStreamReader<'a>
     data_ref: &'a JpegRawData,
     read_pos: usize,
     read_bitpos: usize,
+    needs_escape: usize,
 }
 
 #[allow(dead_code)]
@@ -156,7 +157,13 @@ impl<'a> JpegBitStreamReader<'a>
 {
     pub fn new(data: &'a JpegRawData) -> Self
     {
-        JpegBitStreamReader{ data_ref: data, read_pos: 0, read_bitpos: 0 }
+        JpegBitStreamReader
+        {
+            data_ref: data,
+            read_pos: 0,
+            read_bitpos: 0,
+            needs_escape: 0,
+        }
     }
 
     pub fn copy(&self) -> Self
@@ -165,7 +172,8 @@ impl<'a> JpegBitStreamReader<'a>
         {
             data_ref: self.data_ref,
             read_pos: self.read_pos,
-            read_bitpos: self.read_bitpos
+            read_bitpos: self.read_bitpos,
+            needs_escape: self.needs_escape,
         }
     }
 
@@ -180,21 +188,28 @@ impl<'a> JpegBitStreamReader<'a>
         self.read_bitpos = bitpos;
     }
 
-    pub fn move_bitpos(&mut self, offset_bits: isize)
+    pub fn move_bitpos(&mut self, offset_bits: usize)
     {
-        let mut i = self.read_bitpos as isize + offset_bits;
-        let j = i / 8 + self.read_pos as isize;
-        i = i & 7;
-        self.read_pos = if j < 0
+        let mut i = self.read_bitpos + offset_bits;
+        // Escape the 0x00 after 0xFF.
+        if self.needs_escape > 0 && i >= self.needs_escape * 8
         {
-            0
+            i += 8;
         }
-        else
-        {
-            j as usize
-        };
+        let j = i / 8 + self.read_pos;
+        i = i & 7;
+        self.read_pos = j;
         self.read_bitpos = i as usize;
-        //println!("Pos:{} Bit:{}", self.read_pos, self.read_bitpos);
+        
+        /*
+        println!("Pos:{} Bit:{} {:08b} {:08b} {:08b}",
+                  self.read_pos,
+                  self.read_bitpos,
+                  self.data_ref.read_u8(self.read_pos).unwrap(),
+                  self.data_ref.read_u8(self.read_pos + 1).unwrap(),
+                  self.data_ref.read_u8(self.read_pos + 2).unwrap(),
+                );
+        */
     }
 
     pub fn is_end(&self) -> bool
@@ -209,8 +224,36 @@ impl<'a> JpegBitStreamReader<'a>
         assert!(r1.is_some());
         let mut b0 = r0.unwrap();
         let mut b1 = r1.unwrap();
-        //println!("{:016b}", b0);
-        //println!("{:08b}", b1);
+
+        // Checking marker escape sequence
+        self.needs_escape = 0;
+        if b0 & 0xFF00 == 0xFF00
+        {
+            if b0 == 0xFF00 // Normal case where the stream contain 0xFF.
+            {
+                b0 = b0 | b1 as u16;
+                self.needs_escape = 1;
+            }
+            else
+            {
+                println!("An unexpected marker detected: {:4x}", b0);
+                // ToDo: exceptional sequence
+            }
+        }
+        else if ( b0 & 0x00FF == 0x00FF ) && b1 == 0x00
+        {
+            self.needs_escape = 2;
+        }
+
+        if self.needs_escape > 0
+        {
+            //println!("**** Detected 0xFF followed by 0x00. Reading one more byte.");
+            let r2 = self.data_ref.read_u8(self.read_pos + 3);
+            assert!(r2.is_some());
+            b1 = r2.unwrap();
+        }
+
+        // Align to the current bit position.
         b0 = b0 << self.read_bitpos;
         b1 = if self.read_bitpos == 0
         {
@@ -220,11 +263,29 @@ impl<'a> JpegBitStreamReader<'a>
         {
             b1 >> (8 - self.read_bitpos)
         };
-        //println!("{:016b}", b0);
-        //println!("{:08b}", b1);
-        b0 = b0 | b1 as u16;
-        
-        return b0;
+
+        b0 | b1 as u16
+    }
+
+    pub fn check_marker(&mut self)
+    {
+        let offset = if self.read_bitpos == 0 { 0 } else { 1 };
+        let r0 = self.data_ref.read_u16be(self.read_pos + offset);
+        assert!(r0.is_some());
+        let b0 = r0.unwrap();
+        if b0 & 0xFF00 == 0xFF00
+        {
+            if b0 == 0xFF00
+            {
+                println!("**** Detected 0x00 after 0xFF.");
+            }
+            else
+            {   
+                println!("**** Detected a marker {:04x}", b0);
+                self.read_pos += 2 + offset;
+                self.read_bitpos = 0;
+            }
+        }
     }
 }
 
