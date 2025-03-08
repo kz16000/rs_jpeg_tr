@@ -94,7 +94,7 @@ impl JpegSampleBlock
 
     fn transform(&mut self)
     {
-        let tm = JpegIdctManager::new();
+        let mut tm = JpegIdctManager::new();
         tm.idct(&mut self.sample);
     }
 

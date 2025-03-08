@@ -44,7 +44,7 @@ impl JpegIdctManager
     }
 
     // Tabled version of discrete cos(i * PI /16)
-    fn lookup_tabled_cos(idx: usize) -> f32
+    fn lookup_tabled_cos(&self, idx: usize) -> f32
     {
         let mut i = idx & (Self::COS_TABLE_SIZE - 1);
         let mut sign = if idx & (Self::COS_TABLE_SIZE << 1) == 0 { 1.0_f32 } else { -1.0_f32 };
@@ -64,7 +64,7 @@ impl JpegIdctManager
     }
 
     // Non-optimized straight-forward implementation
-    pub fn idct(mut self, coef: &mut [i16])
+    pub fn idct(&mut self, coef: &mut [i16])
     {
         for y in 0..8
         {
@@ -85,8 +85,8 @@ impl JpegIdctManager
                             * ((2.0_f32 * fy + 1.0_f32) * v as f32 * PI / 16.0_f32 ).cos()
                         */
                         val += cu * cv * (coef[v*8 + u] as f32)
-                            * Self::lookup_tabled_cos( (x * 2 + 1) * u)
-                            * Self::lookup_tabled_cos( (y * 2 + 1) * v);
+                            * self.lookup_tabled_cos( (x * 2 + 1) * u)
+                            * self.lookup_tabled_cos( (y * 2 + 1) * v);
                     }
                 }
                 self.tmp[y*8 + x] = val;
@@ -100,11 +100,11 @@ impl JpegIdctManager
     }
 
     // For debug
-    pub fn dump_cos_table(self)
+    pub fn dump_cos_table(&self)
     {
         for i in 0..32
         {
-            let v = Self::lookup_tabled_cos(i);
+            let v = self.lookup_tabled_cos(i);
             println!("cos(i={}): {}", i, v);
         }  
     }
