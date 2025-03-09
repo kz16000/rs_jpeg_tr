@@ -43,6 +43,24 @@ impl JpegIdctManager
         }
     }
 
+    // Offset and clamp function to fit f32 value into range (0-255)
+    fn offset_and_clamp(val: f32) -> i16
+    {
+        let i: i16 = (val + 128.5_f32) as i16;
+        if i < 0
+        {
+            0
+        }
+        else if i > 255
+        {
+            255
+        } 
+        else
+        {
+            i
+        }
+    }
+
     // Tabled version of discrete cos(i * PI /16)
     fn lookup_tabled_cos(&self, idx: usize) -> f32
     {
@@ -68,10 +86,8 @@ impl JpegIdctManager
     {
         for y in 0..8
         {
-            //let fy = y as f32;
             for x in 0..8
             {
-                //let fx = x as f32;
                 let mut val: f32 = 0.0_f32;
                 for v in 0..8
                 {
@@ -79,11 +95,6 @@ impl JpegIdctManager
                     for u in 0..8
                     {
                         let cu = if u == 0 { Self::FRAC_1_2SQRT2 } else { Self::FRAC_1_2 };
-                        /*
-                        val += cu * cv * (coef[v*8 + u] as f32)
-                            * ((2.0_f32 * fx + 1.0_f32) * u as f32 * PI / 16.0_f32 ).cos()
-                            * ((2.0_f32 * fy + 1.0_f32) * v as f32 * PI / 16.0_f32 ).cos()
-                        */
                         val += cu * cv * (coef[v*8 + u] as f32)
                             * self.lookup_tabled_cos( (x * 2 + 1) * u)
                             * self.lookup_tabled_cos( (y * 2 + 1) * v);
@@ -95,7 +106,7 @@ impl JpegIdctManager
 
         for i in 0..JPEG_SAMPLE_BLOCK_SIZE
         {
-            coef[i] = self.tmp[i] as i16;
+            coef[i] = Self::offset_and_clamp(self.tmp[i]);
         }
     }
 
