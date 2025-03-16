@@ -2,14 +2,18 @@
 //  jpeg_sample_block.rs
 //
 //========================================================
-use crate::jpeg_constants::JPEG_SAMPLE_BLOCK_SIZE;
-use crate::jpeg_constants::JPEG_MAX_NUM_OF_COMPONENTS;
-use crate::jpeg_constants::JPEG_REV_ZIGZAG_TABLE;
+use crate::jpeg_constants::
+{
+    JPEG_SAMPLE_BLOCK_SIZE,
+    JPEG_MAX_NUM_OF_COMPONENTS,
+    JPEG_REV_ZIGZAG_TABLE,
+};
 use crate::jpeg_frame_info;
 use crate::jpeg_raw_data::JpegBitStreamReader;
 use crate::jpeg_huffman_table::JpegDhtManager;
 use crate::jpeg_quantization_table::JpegDqtManager;
 use crate::jpeg_idct::JpegIdctManager;
+use crate::jpeg_sampler::JpegSampler422;
 
 const JPEG_MCU_MAX_NUM_BLOCKS: usize = 6;
 
@@ -24,7 +28,7 @@ pub enum JpegSampleMode
 
 #[derive(Copy)]
 #[derive(Clone)]
-struct JpegSampleBlock
+pub struct JpegSampleBlock
 {
     sample: [i16; JPEG_SAMPLE_BLOCK_SIZE],
     index: usize,
@@ -54,7 +58,7 @@ impl JpegSampleBlock
         }
     }
 
-    fn reset(&mut self)
+    fn reset_index(&mut self)
     {
         self.index = 0;
     }
@@ -98,6 +102,11 @@ impl JpegSampleBlock
         tm.idct(&mut self.sample);
     }
 
+    pub fn iter(&self) -> std::slice::Iter<i16>
+    {
+        self.sample.iter()
+    }
+
     fn dump(&self)
     {
         for i in 0..JPEG_SAMPLE_BLOCK_SIZE
@@ -135,7 +144,7 @@ impl JpegMinimumCodedUnit
         self.index = 0;
         for i in 0..JPEG_MCU_MAX_NUM_BLOCKS
         {
-            self.blocks[i].reset();
+            self.blocks[i].reset_index();
         }
     }
 
@@ -216,6 +225,13 @@ impl JpegMinimumCodedUnit
         {
             self.blocks[i].transform();
         }
+    }
+
+    // Up-sampling
+    pub fn upsampling(&self, out_buf: &mut [u8])
+    {
+        let sampler = JpegSampler422::new();
+        sampler.upsampling(&self.blocks, out_buf);
     }
 
     // Sets MCU mode via component sampling information

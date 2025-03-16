@@ -135,6 +135,26 @@ impl JpegControl
         mcu.dump();
         mcu.transform();
         mcu.dump();
+
+        let mut img_buffer: [u8; 1024] = [0; 1024];
+        mcu.upsampling(&mut img_buffer);
+
+        // Dumps result image buffer
+        let mut count = 0;
+        for d in img_buffer
+        {
+            print!("0x{:02x} ", d);
+            count += 1;
+            if count >= 12
+            {
+                println!();
+                count = 0;
+            }
+            else if count % 3 == 0
+            {
+                print!("| ");
+            }
+        }
     }
 }
 
