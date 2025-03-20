@@ -13,7 +13,7 @@ use crate::jpeg_raw_data::JpegBitStreamReader;
 use crate::jpeg_huffman_table::JpegDhtManager;
 use crate::jpeg_quantization_table::JpegDqtManager;
 use crate::jpeg_idct::JpegIdctManager;
-use crate::jpeg_sampler::JpegSampler422;
+use crate::jpeg_sampler;
 
 const JPEG_MCU_MAX_NUM_BLOCKS: usize = 6;
 
@@ -230,7 +230,7 @@ impl JpegMinimumCodedUnit
     // Up-sampling
     pub fn upsampling(&self, out_buf: &mut [u8])
     {
-        let sampler = JpegSampler422::new();
+        let sampler = jpeg_sampler::JpegSampler440::new();
         sampler.upsampling(&self.blocks, out_buf);
     }
 
