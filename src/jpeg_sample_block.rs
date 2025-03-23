@@ -13,7 +13,7 @@ use crate::jpeg_raw_data::JpegBitStreamReader;
 use crate::jpeg_huffman_table::JpegDhtManager;
 use crate::jpeg_quantization_table::JpegDqtManager;
 use crate::jpeg_idct::JpegIdctManager;
-use crate::jpeg_sampler;
+use crate::jpeg_sampler::JpegSampler;
 
 const JPEG_MCU_MAX_NUM_BLOCKS: usize = 6;
 
@@ -41,6 +41,7 @@ pub struct JpegMinimumCodedUnit
     dht_ids: [u8; JPEG_MAX_NUM_OF_COMPONENTS],
     sampling_factor: [jpeg_frame_info::JpegSamplingFactor; JPEG_MAX_NUM_OF_COMPONENTS],
     last_dc: [i16; JPEG_MAX_NUM_OF_COMPONENTS],
+    sampler: JpegSampler,
     index: usize,
     num_blocks_in_mcu: usize,
 }
@@ -134,6 +135,7 @@ impl JpegMinimumCodedUnit
             dht_ids: [0; JPEG_MAX_NUM_OF_COMPONENTS],
             sampling_factor: [jpeg_frame_info::JpegSamplingFactor::new(); JPEG_MAX_NUM_OF_COMPONENTS],
             last_dc: [0; JPEG_MAX_NUM_OF_COMPONENTS],
+            sampler: JpegSampler::new(),
             index: 0,
             num_blocks_in_mcu: JPEG_MCU_MAX_NUM_BLOCKS,
         }
@@ -230,8 +232,7 @@ impl JpegMinimumCodedUnit
     // Up-sampling
     pub fn upsampling(&self, out_buf: &mut [u8])
     {
-        let sampler = jpeg_sampler::JpegSampler440::new();
-        sampler.upsampling(&self.blocks, out_buf);
+        self.sampler.upsampling(&self.blocks, out_buf);
     }
 
     // Sets MCU mode via component sampling information

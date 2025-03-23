@@ -4,6 +4,20 @@
 //========================================================
 use crate::jpeg_sample_block::JpegSampleBlock;
 
+#[allow(dead_code)]
+pub enum JpegSampleMode
+{
+    JpegSampleMode444,
+    JpegSampleMode422,
+    JpegSampleMode440,
+    JpegSampleMode420,
+}
+
+#[allow(dead_code)]
+pub struct JpegSampler
+{
+    upsampling_func: fn(&[JpegSampleBlock], &mut[u8]),
+}
 
 macro_rules! put_pixel
 {
@@ -15,34 +29,25 @@ macro_rules! put_pixel
 }
 
 #[allow(dead_code)]
-pub struct JpegSampler444
+impl JpegSampler
 {
-
-}
-
-#[allow(dead_code)]
-pub struct JpegSampler422
-{
-
-}
-
-#[allow(dead_code)]
-pub struct JpegSampler440
-{
-
-}
-
-#[allow(dead_code)]
-impl JpegSampler444
-{
-    // Constructor
+    // constructor
     pub fn new() -> Self
     {
-        JpegSampler444{}
+        JpegSampler
+        {
+            upsampling_func: Self::upsampling444,
+        }
     }
 
-    // Perform Up-sampling
+    // Calling the current upsampler
     pub fn upsampling(&self, blocks: &[JpegSampleBlock], out_buf: &mut[u8])
+    {
+        (self.upsampling_func)(blocks, out_buf);
+    }
+
+    // For 4:4:4 (no upsampling)
+    fn upsampling444(blocks: &[JpegSampleBlock], out_buf: &mut[u8])
     {
         let mut i = 0;
         let iter_y = blocks[0].iter();
@@ -53,19 +58,9 @@ impl JpegSampler444
             put_pixel!(out_buf, i, *y as u8, *cb as u8, *cr as u8);
         }
     }
-}
 
-#[allow(dead_code)]
-impl JpegSampler422
-{
-    // Constructor
-    pub fn new() -> Self
-    {
-        JpegSampler422{}
-    }
-
-    // Perform Up-sampling
-    pub fn upsampling(&self, blocks: &[JpegSampleBlock], out_buf: &mut[u8])
+    // Up-sampling for 4:2:2
+    fn upsampling422(blocks: &[JpegSampleBlock], out_buf: &mut[u8])
     {
         let mut i = 0;
         let mut iter_y0 = blocks[0].iter();
@@ -92,19 +87,9 @@ impl JpegSampler422
             t = (t + 1) & 7;
         }
     }
-}
 
-#[allow(dead_code)]
-impl JpegSampler440
-{
-    // Constructor
-    pub fn new() -> Self
-    {
-        JpegSampler440{}
-    }
-
-    // Perform Up-sampling
-    pub fn upsampling(&self, blocks: &[JpegSampleBlock], out_buf: &mut[u8])
+    // Up-sampling for 440
+    fn upsampling440(blocks: &[JpegSampleBlock], out_buf: &mut[u8])
     {
         let mut i = 0;
         let mut t = 0;
