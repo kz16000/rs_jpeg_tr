@@ -39,6 +39,11 @@ impl JpegSamplingFactor
         self.val = val;
     }
 
+    pub fn get_raw(&self) -> usize
+    {
+        self.val as usize
+    }
+
     pub fn get_num_h(&self) -> usize
     {
         (self.val >> 4) as usize

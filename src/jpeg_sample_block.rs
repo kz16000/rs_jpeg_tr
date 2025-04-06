@@ -14,17 +14,9 @@ use crate::jpeg_huffman_table::JpegDhtManager;
 use crate::jpeg_quantization_table::JpegDqtManager;
 use crate::jpeg_idct::JpegIdctManager;
 use crate::jpeg_sampler::JpegSampler;
+use crate::jpeg_sampler::JpegSampleMode;
 
 const JPEG_MCU_MAX_NUM_BLOCKS: usize = 6;
-
-
-#[allow(dead_code)]
-pub enum JpegSampleMode
-{
-    JpegModeYuv444,
-    JpegModeYuv422,
-    JpegModeYuv420,
-}
 
 #[derive(Copy)]
 #[derive(Clone)]
@@ -251,6 +243,21 @@ impl JpegMinimumCodedUnit
             }
         }
         self.num_blocks_in_mcu = i;
+
+        // Picks an adequate sampling mode from the sampling factor of component 0
+        if fh.get_num_components() == 3
+        {
+            let mode =
+                match self.sampling_factor[0].get_raw()
+                {
+                    0x11 => JpegSampleMode::JpegSampleMode444,
+                    0x21 => JpegSampleMode::JpegSampleMode422,
+                    0x12 => JpegSampleMode::JpegSampleMode440,
+                    0x22 => JpegSampleMode::JpegSampleMode420,
+                    _ => JpegSampleMode::JpegSampleModeNone, // Default
+                };
+            self.sampler.set_sampling_mode(mode);
+        }
     }
 
     pub fn dump(&self)

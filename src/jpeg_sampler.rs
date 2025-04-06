@@ -11,6 +11,7 @@ pub enum JpegSampleMode
     JpegSampleMode422,
     JpegSampleMode440,
     JpegSampleMode420,
+    JpegSampleModeNone,
 }
 
 #[allow(dead_code)]
@@ -40,10 +41,33 @@ impl JpegSampler
         }
     }
 
+    // Sets the sampler function
+    pub fn set_sampling_mode(&mut self, mode: JpegSampleMode)
+    {
+        match mode
+        {
+            JpegSampleMode::JpegSampleMode444 => self.upsampling_func = Self::upsampling444,
+            JpegSampleMode::JpegSampleMode422 => self.upsampling_func = Self::upsampling422,
+            JpegSampleMode::JpegSampleMode440 => self.upsampling_func = Self::upsampling440,
+            JpegSampleMode::JpegSampleMode420 => println!("set_sampling_mode: 420 not supported yet."),
+            _ => self.upsampling_func = Self::upsampling1,
+        }
+    }
+
     // Calling the current upsampler
     pub fn upsampling(&self, blocks: &[JpegSampleBlock], out_buf: &mut[u8])
     {
         (self.upsampling_func)(blocks, out_buf);
+    }
+
+    // For mono component (no upsampling)
+    fn upsampling1(blocks)
+    {
+        let mut i = 0;
+        for y in blocks[0]
+        {
+            put_pixel!(out_buf, i, *y as u8, *cb as u8, *cr as u8);
+        }
     }
 
     // For 4:4:4 (no upsampling)
