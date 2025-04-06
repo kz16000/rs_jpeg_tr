@@ -37,7 +37,7 @@ impl JpegSampler
     {
         JpegSampler
         {
-            upsampling_func: Self::upsampling444,
+            upsampling_func: Self::upsampling1,
         }
     }
 
@@ -49,7 +49,7 @@ impl JpegSampler
             JpegSampleMode::JpegSampleMode444 => self.upsampling_func = Self::upsampling444,
             JpegSampleMode::JpegSampleMode422 => self.upsampling_func = Self::upsampling422,
             JpegSampleMode::JpegSampleMode440 => self.upsampling_func = Self::upsampling440,
-            JpegSampleMode::JpegSampleMode420 => println!("set_sampling_mode: 420 not supported yet."),
+            JpegSampleMode::JpegSampleMode420 => self.upsampling_func = Self::upsampling420,
             _ => self.upsampling_func = Self::upsampling1,
         }
     }
@@ -61,12 +61,12 @@ impl JpegSampler
     }
 
     // For mono component (no upsampling)
-    fn upsampling1(blocks)
+    fn upsampling1(blocks: &[JpegSampleBlock], out_buf: &mut[u8])
     {
         let mut i = 0;
-        for y in blocks[0]
+        for y in blocks[0].iter()
         {
-            put_pixel!(out_buf, i, *y as u8, *cb as u8, *cr as u8);
+            put_pixel!(out_buf, i, *y as u8, *y as u8, *y as u8);
         }
     }
 
@@ -139,6 +139,41 @@ impl JpegSampler
                     put_pixel!(out_buf, i, *y as u8, *cb as u8, *cr as u8);
                 }
                 t = (t + 1) & 15;
+            }
+        }
+    }
+
+    // Up-sampling for 420
+    fn upsampling420(blocks: &[JpegSampleBlock], out_buf: &mut[u8])
+    {
+        let mut i = 0;
+        let mut iter_cb0 = blocks[4].iter();
+        let mut iter_cb1 = iter_cb0.clone();
+        let mut iter_cr0 = blocks[5].iter();
+        let mut iter_cr1 = iter_cr0.clone();
+        for x in 0..2
+        {
+            let mut iter_y0 = blocks[x*2].iter();
+            let mut iter_y1 = blocks[x*2+1].iter();
+            for t in 0..64
+            {
+                let cb = (if t & 8 == 0 { iter_cb0.next() } else { iter_cb1.next() }).unwrap();
+                let cr = (if t & 8 == 0 { iter_cr0.next() } else { iter_cr1.next() }).unwrap();
+                
+                if t & 4 == 0
+                {
+                    let y0 = iter_y0.next().unwrap();
+                    put_pixel!(out_buf, i, *y0 as u8, *cb as u8, *cr as u8);
+                    let y0 = iter_y0.next().unwrap();
+                    put_pixel!(out_buf, i, *y0 as u8, *cb as u8, *cr as u8);
+                }
+                else
+                {
+                    let y1 = iter_y1.next().unwrap();
+                    put_pixel!(out_buf, i, *y1 as u8, *cb as u8, *cr as u8);
+                    let y1 = iter_y1.next().unwrap();
+                    put_pixel!(out_buf, i, *y1 as u8, *cb as u8, *cr as u8);
+                }
             }
         }
     }
