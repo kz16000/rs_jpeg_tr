@@ -27,10 +27,10 @@ pub struct JpegSampler
 
 macro_rules! put_pixel
 {
-    ($out_buf:expr, $i:expr, $ccv:expr) =>
+    ($out_buf:expr, $i:expr, $ccv:expr, $stride:expr) =>
     {
         ($out_buf[$i], $out_buf[$i+1], $out_buf[$i+2]) = $ccv;
-        $i += 3;
+        $i += $stride;
     };
 }
 
@@ -69,58 +69,82 @@ impl JpegSampler
     // For mono component (no upsampling)
     fn upsampling1(blocks: &[JpegSampleBlock], convert_func: ColorConvertFunc, out_buf: &mut[u8])
     {
+        let c_stride = 3;
+        let lf_stride = 0;
         let mut i = 0;
+        let mut t = 0;
         for y in blocks[0].iter()
         {
-            put_pixel!(out_buf, i, convert_func(*y, 0x80, 0x80));
+            put_pixel!(out_buf, i, convert_func(*y, 0x80, 0x80), c_stride);
+            t = (t + 1) & 7;
+            if t == 0
+            {
+                i += lf_stride;
+            }
         }
     }
 
     // For 4:4:4 (no upsampling)
     fn upsampling444(blocks: &[JpegSampleBlock], convert_func: ColorConvertFunc, out_buf: &mut[u8])
     {
+        let c_stride = 3;
+        let lf_stride = 12;
         let mut i = 0;
+        let mut t = 0;
         let iter_y = blocks[0].iter();
         let iter_cb = blocks[1].iter();
         let iter_cr = blocks[2].iter();
         for (y, (cb, cr)) in iter_y.zip(iter_cb.zip(iter_cr))
         {
-            put_pixel!(out_buf, i, convert_func(*y, *cb, *cr));
+            put_pixel!(out_buf, i, convert_func(*y, *cb, *cr), c_stride);
+            t = (t + 1) & 7;
+            if t == 0
+            {
+                i += lf_stride;
+            }
         }
     }
 
     // Up-sampling for 4:2:2
     fn upsampling422(blocks: &[JpegSampleBlock], convert_func: ColorConvertFunc, out_buf: &mut[u8])
     {
+        let c_stride = 3;
+        let lf_stride = 12;
         let mut i = 0;
+        let mut t = 0;
         let mut iter_y0 = blocks[0].iter();
         let mut iter_y1 = blocks[1].iter();
         let iter_cb = blocks[2].iter();
         let iter_cr = blocks[3].iter();
-        let mut t = 0;
         for (cb, cr) in iter_cb.zip(iter_cr)
         {
             if t < 4
             {
                 let y0 = iter_y0.next().unwrap();
-                put_pixel!(out_buf, i, convert_func(*y0, *cb, *cr));
+                put_pixel!(out_buf, i, convert_func(*y0, *cb, *cr), c_stride);
                 let y0 = iter_y0.next().unwrap();
-                put_pixel!(out_buf, i, convert_func(*y0, *cb, *cr));
+                put_pixel!(out_buf, i, convert_func(*y0, *cb, *cr), c_stride);
             }
             else
             {
                 let y1 = iter_y1.next().unwrap();
-                put_pixel!(out_buf, i, convert_func(*y1, *cb, *cr));
+                put_pixel!(out_buf, i, convert_func(*y1, *cb, *cr), c_stride);
                 let y1 = iter_y1.next().unwrap();
-                put_pixel!(out_buf, i, convert_func(*y1, *cb, *cr));
+                put_pixel!(out_buf, i, convert_func(*y1, *cb, *cr), c_stride);
             }
             t = (t + 1) & 7;
+            if t == 0
+            {
+                i += lf_stride;
+            }
         }
     }
 
     // Up-sampling for 440
     fn upsampling440(blocks: &[JpegSampleBlock], convert_func: ColorConvertFunc, out_buf: &mut[u8])
     {
+        let c_stride = 3;
+        let lf_stride = 12;
         let mut i = 0;
         let mut t = 0;
         let mut iter_cb0 = blocks[2].iter();
@@ -136,15 +160,19 @@ impl JpegSampler
                 {
                     let cb = iter_cb0.next().unwrap();
                     let cr = iter_cr0.next().unwrap();
-                    put_pixel!(out_buf, i, convert_func(*y, *cb, *cr));
+                    put_pixel!(out_buf, i, convert_func(*y, *cb, *cr), c_stride);
                 }
                 else
                 {
                     let cb = iter_cb1.next().unwrap();
                     let cr = iter_cr1.next().unwrap();
-                    put_pixel!(out_buf, i, convert_func(*y, *cb, *cr));
+                    put_pixel!(out_buf, i, convert_func(*y, *cb, *cr), c_stride);
                 }
                 t = (t + 1) & 15;
+                if t & 7 == 0
+                {
+                    i += lf_stride;
+                }   
             }
         }
     }
@@ -152,6 +180,8 @@ impl JpegSampler
     // Up-sampling for 420
     fn upsampling420(blocks: &[JpegSampleBlock], convert_func: ColorConvertFunc, out_buf: &mut[u8])
     {
+        let c_stride = 3;
+        let lf_stride = 12;
         let mut i = 0;
         let mut iter_cb0 = blocks[4].iter();
         let mut iter_cb1 = iter_cb0.clone();
@@ -169,17 +199,22 @@ impl JpegSampler
                 if t & 4 == 0
                 {
                     let y0 = iter_y0.next().unwrap();
-                    put_pixel!(out_buf, i, convert_func(*y0, *cb, *cr));
+                    put_pixel!(out_buf, i, convert_func(*y0, *cb, *cr), c_stride);
                     let y0 = iter_y0.next().unwrap();
-                    put_pixel!(out_buf, i, convert_func(*y0, *cb, *cr));
+                    put_pixel!(out_buf, i, convert_func(*y0, *cb, *cr), c_stride);
                 }
                 else
                 {
                     let y1 = iter_y1.next().unwrap();
-                    put_pixel!(out_buf, i, convert_func(*y1, *cb, *cr));
+                    put_pixel!(out_buf, i, convert_func(*y1, *cb, *cr), c_stride);
                     let y1 = iter_y1.next().unwrap();
-                    put_pixel!(out_buf, i, convert_func(*y1, *cb, *cr));
+                    put_pixel!(out_buf, i, convert_func(*y1, *cb, *cr), c_stride);
                 }
+
+                if t & 7 == 7
+                {
+                    i += lf_stride;
+                }   
             }
         }
     }
