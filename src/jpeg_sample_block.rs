@@ -15,6 +15,7 @@ use crate::jpeg_quantization_table::JpegDqtManager;
 use crate::jpeg_idct::JpegIdctManager;
 use crate::jpeg_sampler::JpegSampler;
 use crate::jpeg_sampler::JpegSampleMode;
+use crate::jpeg_outbuffer_info::JpegOutBufferInfo;
 
 const JPEG_MCU_MAX_NUM_BLOCKS: usize = 6;
 
@@ -222,9 +223,9 @@ impl JpegMinimumCodedUnit
     }
 
     // Up-sampling
-    pub fn upsampling(&self, out_buf: &mut [u8])
+    pub fn upsampling(&self, out_buf: &mut [u8], buf_info: &JpegOutBufferInfo)
     {
-        self.sampler.upsampling(&self.blocks, out_buf);
+        self.sampler.upsampling(&self.blocks, out_buf, buf_info);
     }
 
     // Sets MCU mode via component sampling information

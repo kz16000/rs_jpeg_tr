@@ -7,6 +7,7 @@ use crate::jpeg_frame_info;
 use crate::jpeg_sample_block;
 use crate::jpeg_huffman_table;
 use crate::jpeg_quantization_table;
+use crate::jpeg_outbuffer_info;
 
 #[allow(dead_code)]
 enum JpegMarker
@@ -132,12 +133,14 @@ impl JpegControl
         bsreader.set_pos(self.img_start, 0);
         mcu.fill_coefficients(&self.dht_mgr, &mut bsreader);
         mcu.dequantize(&self.dqt_mgr);
-        mcu.dump();
+        // mcu.dump();
         mcu.transform();
-        mcu.dump();
+        // mcu.dump();
 
         let mut img_buffer: [u8; 1024] = [0; 1024];
-        mcu.upsampling(&mut img_buffer);
+        let mut buffer_info = jpeg_outbuffer_info::JpegOutBufferInfo::new();
+        buffer_info.set_parameters(16, 16, 3);
+        mcu.upsampling(&mut img_buffer, &buffer_info);
 
         // Dumps result image buffer
         let mut count = 0;

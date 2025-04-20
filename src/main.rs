@@ -13,6 +13,7 @@ mod jpeg_idct;
 mod jpeg_color_converter;
 mod jpeg_sampler;
 mod jpeg_frame_info;
+mod jpeg_outbuffer_info;
 mod jpeg_control;
 
 fn main() 

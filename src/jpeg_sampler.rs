@@ -5,6 +5,7 @@
 use crate::jpeg_sample_block::JpegSampleBlock;
 use crate::jpeg_color_converter::ColorConvertFunc;
 use crate::jpeg_color_converter;
+use crate::jpeg_outbuffer_info::JpegOutBufferInfo;
 
 #[allow(dead_code)]
 pub enum JpegSampleMode
@@ -16,7 +17,7 @@ pub enum JpegSampleMode
     JpegSampleModeNone,
 }
 
-type UpsamplerFunc = fn(&[JpegSampleBlock], ColorConvertFunc, &mut[u8]);
+type UpsamplerFunc = fn(&[JpegSampleBlock], ColorConvertFunc, &mut[u8], &JpegOutBufferInfo);
 
 #[allow(dead_code)]
 pub struct JpegSampler
@@ -61,16 +62,21 @@ impl JpegSampler
     }
 
     // Calling the current upsampler
-    pub fn upsampling(&self, blocks: &[JpegSampleBlock], out_buf: &mut[u8])
+    pub fn upsampling(&self, blocks: &[JpegSampleBlock], out_buf: &mut[u8], buf_info: &JpegOutBufferInfo)
     {
-        (self.upsampling_func)(blocks, self.color_convert_func, out_buf);
+        (self.upsampling_func)(blocks, self.color_convert_func, out_buf, buf_info);
     }
 
     // For mono component (no upsampling)
-    fn upsampling1(blocks: &[JpegSampleBlock], convert_func: ColorConvertFunc, out_buf: &mut[u8])
+    fn upsampling1(
+        blocks: &[JpegSampleBlock],
+        convert_func: ColorConvertFunc,
+        out_buf: &mut[u8],
+        buf_info: &JpegOutBufferInfo
+    )
     {
-        let c_stride = 3;
-        let lf_stride = 0;
+        let c_stride = buf_info.get_bpp();
+        let lf_stride = (buf_info.get_width() - 8) * c_stride;
         let mut i = 0;
         let mut t = 0;
         for y in blocks[0].iter()
@@ -85,10 +91,15 @@ impl JpegSampler
     }
 
     // For 4:4:4 (no upsampling)
-    fn upsampling444(blocks: &[JpegSampleBlock], convert_func: ColorConvertFunc, out_buf: &mut[u8])
+    fn upsampling444(
+        blocks: &[JpegSampleBlock],
+        convert_func: ColorConvertFunc,
+        out_buf: &mut[u8],
+        buf_info: &JpegOutBufferInfo
+    )
     {
-        let c_stride = 3;
-        let lf_stride = 12;
+        let c_stride = buf_info.get_bpp();
+        let lf_stride = (buf_info.get_width() - 8) * c_stride;
         let mut i = 0;
         let mut t = 0;
         let iter_y = blocks[0].iter();
@@ -106,10 +117,15 @@ impl JpegSampler
     }
 
     // Up-sampling for 4:2:2
-    fn upsampling422(blocks: &[JpegSampleBlock], convert_func: ColorConvertFunc, out_buf: &mut[u8])
+    fn upsampling422(
+        blocks: &[JpegSampleBlock],
+        convert_func: ColorConvertFunc,
+        out_buf: &mut[u8],
+        buf_info: &JpegOutBufferInfo
+    )
     {
-        let c_stride = 3;
-        let lf_stride = 12;
+        let c_stride = buf_info.get_bpp();
+        let lf_stride = (buf_info.get_width() - 16) * c_stride;
         let mut i = 0;
         let mut t = 0;
         let mut iter_y0 = blocks[0].iter();
@@ -141,10 +157,15 @@ impl JpegSampler
     }
 
     // Up-sampling for 440
-    fn upsampling440(blocks: &[JpegSampleBlock], convert_func: ColorConvertFunc, out_buf: &mut[u8])
+    fn upsampling440(
+        blocks: &[JpegSampleBlock],
+        convert_func: ColorConvertFunc,
+        out_buf: &mut[u8],
+        buf_info: &JpegOutBufferInfo
+    )
     {
-        let c_stride = 3;
-        let lf_stride = 12;
+        let c_stride = buf_info.get_bpp();
+        let lf_stride = (buf_info.get_width() - 8) * c_stride;
         let mut i = 0;
         let mut t = 0;
         let mut iter_cb0 = blocks[2].iter();
@@ -178,10 +199,15 @@ impl JpegSampler
     }
 
     // Up-sampling for 420
-    fn upsampling420(blocks: &[JpegSampleBlock], convert_func: ColorConvertFunc, out_buf: &mut[u8])
+    fn upsampling420(
+        blocks: &[JpegSampleBlock],
+        convert_func: ColorConvertFunc,
+        out_buf: &mut[u8],
+        buf_info: &JpegOutBufferInfo
+    )
     {
-        let c_stride = 3;
-        let lf_stride = 12;
+        let c_stride = buf_info.get_bpp();
+        let lf_stride = (buf_info.get_width() - 16) * c_stride;
         let mut i = 0;
         let mut iter_cb0 = blocks[4].iter();
         let mut iter_cb1 = iter_cb0.clone();
