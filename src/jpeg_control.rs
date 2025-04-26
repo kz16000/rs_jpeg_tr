@@ -28,6 +28,7 @@ pub struct JpegControl
     frame_header_info: jpeg_frame_info::JpegFrameHeaderInfo,
     dht_mgr: jpeg_huffman_table::JpegDhtManager,
     dqt_mgr: jpeg_quantization_table::JpegDqtManager,
+    out_buffer_info: jpeg_outbuffer_info::JpegOutBufferInfo,
     img_start: usize,
 }
 
@@ -43,6 +44,7 @@ impl JpegControl
             frame_header_info: jpeg_frame_info::JpegFrameHeaderInfo::new(),
             dht_mgr: jpeg_huffman_table::JpegDhtManager::new(),
             dqt_mgr: jpeg_quantization_table::JpegDqtManager::new(),
+            out_buffer_info: jpeg_outbuffer_info::JpegOutBufferInfo::new(),
             img_start: 0,
         }
     }
@@ -114,6 +116,9 @@ impl JpegControl
             print!("{} {:04x} \n", marker_name, seg_size);
         }
         
+        let (wd, ht) = self.frame_header_info.get_dimension();
+        self.out_buffer_info.set_parameters(wd, ht, 3);
+
         /*
         self.frame_header_info.dump();       
         self.dht_mgr.dump();
@@ -121,9 +126,22 @@ impl JpegControl
         */
     }
 
-    // Decoding image
-    pub fn decode_image(&mut self)
+    // Get total size of output buffer
+    pub fn get_total_buffer_size(&self) -> usize
     {
+        self.out_buffer_info.get_total_buffer_size()
+    }
+
+    // Decoding image
+    pub fn decode_image(&mut self, out_buf: &mut [u8])
+    {
+        // Buffer size check
+        if out_buf.len() < self.out_buffer_info.get_total_buffer_size()
+        {
+            println!("decode_image: Not enough buffer size.");
+            return;
+        }
+
         let mut bsreader = jpeg_raw_data::JpegBitStreamReader::new(&mut self.rawdata);
         let mut mcu = jpeg_sample_block::JpegMinimumCodedUnit::new();
         mcu.set_mode(&self.frame_header_info);
@@ -137,27 +155,7 @@ impl JpegControl
         mcu.transform();
         // mcu.dump();
 
-        let mut img_buffer: [u8; 1024] = [0; 1024];
-        let mut buffer_info = jpeg_outbuffer_info::JpegOutBufferInfo::new();
-        buffer_info.set_parameters(16, 16, 3);
-        mcu.upsampling(&mut img_buffer, &buffer_info);
-
-        // Dumps result image buffer
-        let mut count = 0;
-        for d in img_buffer
-        {
-            print!("0x{:02x} ", d);
-            count += 1;
-            if count >= 12
-            {
-                println!();
-                count = 0;
-            }
-            else if count % 3 == 0
-            {
-                print!("| ");
-            }
-        }
+        mcu.upsampling(out_buf, &self.out_buffer_info);
     }
 }
 

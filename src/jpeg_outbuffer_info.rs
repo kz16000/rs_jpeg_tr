@@ -25,11 +25,11 @@ impl JpegOutBufferInfo
     }
 
     // Sets parmeters
-    pub fn set_parameters(&mut self, width: u16, height: u16, bpp: u8)
+    pub fn set_parameters(&mut self, width: usize, height: usize, bpp: usize)
     {
-        self.width = width;
-        self.height = height;
-        self.bpp = bpp;
+        self.width = width as u16;
+        self.height = height as u16;
+        self.bpp = bpp as u8;
     }
 
     // Gets width
@@ -49,6 +49,13 @@ impl JpegOutBufferInfo
     {
         self.bpp as usize
     }
+
+    // Gets total buffer size
+    pub fn get_total_buffer_size(&self) -> usize
+    {
+        self.width as usize * self.height as usize * self.bpp as usize
+    }
+
 }
 
 //========================================================
