@@ -132,6 +132,12 @@ impl JpegControl
         self.out_buffer_info.get_total_buffer_size()
     }
 
+    // Get dimension of the image
+    pub fn get_dimension(&self) -> (usize, usize)
+    {
+        self.frame_header_info.get_dimension()
+    }
+
     // Decoding image
     pub fn decode_image(&mut self, out_buf: &mut [u8])
     {

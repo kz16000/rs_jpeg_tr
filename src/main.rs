@@ -32,6 +32,9 @@ fn main()
     jpeg.read_from_file(infilename);
     jpeg.parse_markers();
 
+    // Image width/height
+    let (width, height) = jpeg.get_dimension();
+
     // Allocate output buffer
     let buf_size = jpeg.get_total_buffer_size();
     let val: u8 = 0;
@@ -39,8 +42,22 @@ fn main()
 
     jpeg.decode_image(&mut img_buffer);
 
-    // Dumps result image buffer
+    // Dumps result image buffer as PPM ASCII format
     let mut count = 0;
+    println!("P3");
+    println!("{} {}", width, height);
+    println!("255");
+    for d in img_buffer
+    {
+        print!("{} ", d);
+        count += 1;
+        if count >= 24
+        {
+            println!();
+            count = 0;
+        }
+    }
+    /*
     for d in img_buffer
     {
         print!("0x{:02x} ", d);
@@ -55,6 +72,7 @@ fn main()
             print!("| ");
         }
     }
+    */
 }
 
 //========================================================
