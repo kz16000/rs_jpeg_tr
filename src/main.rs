@@ -3,6 +3,9 @@
 //
 //========================================================
 use std::env;
+use std::fs::File;
+use std::io::Write;
+use std::io::Result;
 
 mod jpeg_constants;
 mod jpeg_raw_data;
@@ -16,7 +19,7 @@ mod jpeg_frame_info;
 mod jpeg_outbuffer_info;
 mod jpeg_control;
 
-fn main() 
+fn main() -> Result<()>
 {
     // コマンドライン引数読み込み
     let args: Vec<String> = env::args().collect();
@@ -43,36 +46,23 @@ fn main()
     jpeg.decode_image(&mut img_buffer);
 
     // Dumps result image buffer as PPM ASCII format
+    let mut out_file = File::create("out.ppm")?;
     let mut count = 0;
-    println!("P3");
-    println!("{} {}", width, height);
-    println!("255");
+    writeln!(out_file, "P3")?;
+    writeln!(out_file, "{} {}", width, height)?;
+    writeln!(out_file, "255")?;
     for d in img_buffer
     {
-        print!("{} ", d);
+        write!(out_file, "{} ", d)?;
         count += 1;
         if count >= 24
         {
-            println!();
+            writeln!(out_file)?;
             count = 0;
         }
     }
-    /*
-    for d in img_buffer
-    {
-        print!("0x{:02x} ", d);
-        count += 1;
-        if count >= 12
-        {
-            println!();
-            count = 0;
-        }
-        else if count % 3 == 0
-        {
-            print!("| ");
-        }
-    }
-    */
+
+    Ok(())
 }
 
 //========================================================
