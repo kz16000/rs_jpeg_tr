@@ -154,14 +154,29 @@ impl JpegControl
 
         //self.dht_mgr.set_log_control(0xFF);
 
+        // Iteration of each MCU decode
+        let mut out_pos: usize = 0;
+        let num_iter_x = self.out_buffer_info.get_width() / mcu.get_pixel_width();
+        let num_iter_y = self.out_buffer_info.get_height() / mcu.get_pixel_height();
+        let stride_h = mcu.get_pixel_width() * self.out_buffer_info.get_bpp();
+        let stride_v = self.out_buffer_info.get_width() * self.out_buffer_info.get_bpp()
+                     * (mcu.get_pixel_height() - 1);
         bsreader.set_pos(self.img_start, 0);
-        mcu.fill_coefficients(&self.dht_mgr, &mut bsreader);
-        mcu.dequantize(&self.dqt_mgr);
-        // mcu.dump();
-        mcu.transform();
-        // mcu.dump();
+        for _y in 0..num_iter_y
+        {
+            for _x in 0..num_iter_x
+            {
+                mcu.fill_coefficients(&self.dht_mgr, &mut bsreader);
+                mcu.dequantize(&self.dqt_mgr);
+                // mcu.dump();
+                mcu.transform();
+                // mcu.dump();
+                mcu.upsampling(out_buf, &self.out_buffer_info, out_pos);
 
-        mcu.upsampling(out_buf, &self.out_buffer_info);
+                out_pos += stride_h;
+            }
+            out_pos += stride_v;
+        }
     }
 }
 

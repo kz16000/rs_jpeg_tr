@@ -17,7 +17,13 @@ pub enum JpegSampleMode
     JpegSampleModeNone,
 }
 
-type UpsamplerFunc = fn(&[JpegSampleBlock], ColorConvertFunc, &mut[u8], &JpegOutBufferInfo);
+type UpsamplerFunc = fn(
+    &[JpegSampleBlock],
+    ColorConvertFunc,
+    &mut[u8],
+    &JpegOutBufferInfo,
+    usize
+);
 
 #[allow(dead_code)]
 pub struct JpegSampler
@@ -62,9 +68,15 @@ impl JpegSampler
     }
 
     // Calling the current upsampler
-    pub fn upsampling(&self, blocks: &[JpegSampleBlock], out_buf: &mut[u8], buf_info: &JpegOutBufferInfo)
+    pub fn upsampling(
+        &self,
+        blocks: &[JpegSampleBlock],
+        out_buf: &mut[u8],
+        buf_info: &JpegOutBufferInfo,
+        pos: usize
+    )
     {
-        (self.upsampling_func)(blocks, self.color_convert_func, out_buf, buf_info);
+        (self.upsampling_func)(blocks, self.color_convert_func, out_buf, buf_info, pos);
     }
 
     // For mono component (no upsampling)
@@ -72,12 +84,13 @@ impl JpegSampler
         blocks: &[JpegSampleBlock],
         convert_func: ColorConvertFunc,
         out_buf: &mut[u8],
-        buf_info: &JpegOutBufferInfo
+        buf_info: &JpegOutBufferInfo,
+        pos: usize
     )
     {
         let c_stride = buf_info.get_bpp();
         let lf_stride = (buf_info.get_width() - 8) * c_stride;
-        let mut i = 0;
+        let mut i = pos;
         let mut t = 0;
         for y in blocks[0].iter()
         {
@@ -95,12 +108,13 @@ impl JpegSampler
         blocks: &[JpegSampleBlock],
         convert_func: ColorConvertFunc,
         out_buf: &mut[u8],
-        buf_info: &JpegOutBufferInfo
+        buf_info: &JpegOutBufferInfo,
+        pos: usize
     )
     {
         let c_stride = buf_info.get_bpp();
         let lf_stride = (buf_info.get_width() - 8) * c_stride;
-        let mut i = 0;
+        let mut i = pos;
         let mut t = 0;
         let iter_y = blocks[0].iter();
         let iter_cb = blocks[1].iter();
@@ -121,12 +135,13 @@ impl JpegSampler
         blocks: &[JpegSampleBlock],
         convert_func: ColorConvertFunc,
         out_buf: &mut[u8],
-        buf_info: &JpegOutBufferInfo
+        buf_info: &JpegOutBufferInfo,
+        pos: usize
     )
     {
         let c_stride = buf_info.get_bpp();
         let lf_stride = (buf_info.get_width() - 16) * c_stride;
-        let mut i = 0;
+        let mut i = pos;
         let mut t = 0;
         let mut iter_y0 = blocks[0].iter();
         let mut iter_y1 = blocks[1].iter();
@@ -161,12 +176,13 @@ impl JpegSampler
         blocks: &[JpegSampleBlock],
         convert_func: ColorConvertFunc,
         out_buf: &mut[u8],
-        buf_info: &JpegOutBufferInfo
+        buf_info: &JpegOutBufferInfo,
+        pos: usize
     )
     {
         let c_stride = buf_info.get_bpp();
         let lf_stride = (buf_info.get_width() - 8) * c_stride;
-        let mut i = 0;
+        let mut i = pos;
         let mut t = 0;
         let mut iter_cb0 = blocks[2].iter();
         let mut iter_cb1 = iter_cb0.clone();
@@ -203,12 +219,13 @@ impl JpegSampler
         blocks: &[JpegSampleBlock],
         convert_func: ColorConvertFunc,
         out_buf: &mut[u8],
-        buf_info: &JpegOutBufferInfo
+        buf_info: &JpegOutBufferInfo,
+        pos: usize
     )
     {
         let c_stride = buf_info.get_bpp();
         let lf_stride = (buf_info.get_width() - 16) * c_stride;
-        let mut i = 0;
+        let mut i = pos;
         let mut iter_cb0 = blocks[4].iter();
         let mut iter_cb1 = iter_cb0.clone();
         let mut iter_cr0 = blocks[5].iter();

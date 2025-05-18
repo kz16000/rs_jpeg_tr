@@ -18,6 +18,7 @@ use crate::jpeg_sampler::JpegSampleMode;
 use crate::jpeg_outbuffer_info::JpegOutBufferInfo;
 
 const JPEG_MCU_MAX_NUM_BLOCKS: usize = 6;
+const JPEG_MCU_NUM_PIXELS_DEFAULT: u8 = 8;
 
 #[derive(Copy)]
 #[derive(Clone)]
@@ -36,7 +37,9 @@ pub struct JpegMinimumCodedUnit
     last_dc: [i16; JPEG_MAX_NUM_OF_COMPONENTS],
     sampler: JpegSampler,
     index: usize,
-    num_blocks_in_mcu: usize,
+    width: u8,
+    height: u8,
+    num_blocks_in_mcu: u8,
 }
 
 #[allow(dead_code)]
@@ -130,7 +133,9 @@ impl JpegMinimumCodedUnit
             last_dc: [0; JPEG_MAX_NUM_OF_COMPONENTS],
             sampler: JpegSampler::new(),
             index: 0,
-            num_blocks_in_mcu: JPEG_MCU_MAX_NUM_BLOCKS,
+            width: JPEG_MCU_NUM_PIXELS_DEFAULT,
+            height: JPEG_MCU_NUM_PIXELS_DEFAULT,
+            num_blocks_in_mcu: JPEG_MCU_MAX_NUM_BLOCKS as u8,
         }
     }
 
@@ -156,7 +161,7 @@ impl JpegMinimumCodedUnit
     // Add coefficients from huffman-decoded stream
     fn add_coefficients(&mut self, coef: i16, num_zero_run: usize) -> bool
     {
-        if self.index < self.num_blocks_in_mcu
+        if self.index < self.num_blocks_in_mcu as usize
         {
             let finished = self.blocks[self.index].add_coefficients(coef, num_zero_run);
             if finished
@@ -186,7 +191,7 @@ impl JpegMinimumCodedUnit
     {
         self.reset();
 
-        while self.index < self.num_blocks_in_mcu
+        while self.index < self.num_blocks_in_mcu as usize
         {
             let table_id = self.get_current_table_id();
             let dc_decoded = dht.decode_dc(table_id, bsreader);
@@ -205,7 +210,7 @@ impl JpegMinimumCodedUnit
     {
         self.reset();
 
-        while self.index < self.num_blocks_in_mcu
+        while self.index < self.num_blocks_in_mcu as usize
         {
             let table_id = self.get_current_table_id();
             self.blocks[self.index].scale_coefficients(dqt.get_qt_slice(table_id));
@@ -216,16 +221,27 @@ impl JpegMinimumCodedUnit
     // (Inverse) discrete-cosine transform
     pub fn transform(&mut self)
     {
-        for i in 0..self.num_blocks_in_mcu
+        for i in 0..self.num_blocks_in_mcu as usize
         {
             self.blocks[i].transform();
         }
     }
 
     // Up-sampling
-    pub fn upsampling(&self, out_buf: &mut [u8], buf_info: &JpegOutBufferInfo)
+    pub fn upsampling(&self, out_buf: &mut [u8], buf_info: &JpegOutBufferInfo, pos: usize)
     {
-        self.sampler.upsampling(&self.blocks, out_buf, buf_info);
+        self.sampler.upsampling(&self.blocks, out_buf, buf_info, pos);
+    }
+
+    // Pixel width/height of MCU
+    pub fn get_pixel_width(&self) -> usize
+    {
+        self.width as usize
+    }
+
+    pub fn get_pixel_height(&self) -> usize
+    {
+        self.height as usize
     }
 
     // Sets MCU mode via component sampling information
@@ -243,13 +259,14 @@ impl JpegMinimumCodedUnit
                 i += 1;
             }
         }
-        self.num_blocks_in_mcu = i;
+        self.num_blocks_in_mcu = i as u8;
 
         // Picks an adequate sampling mode from the sampling factor of component 0
         if fh.get_num_components() == 3
         {
+            let factor = self.sampling_factor[0].get_raw();
             let mode =
-                match self.sampling_factor[0].get_raw()
+                match factor
                 {
                     0x11 => JpegSampleMode::JpegSampleMode444,
                     0x21 => JpegSampleMode::JpegSampleMode422,
@@ -258,12 +275,15 @@ impl JpegMinimumCodedUnit
                     _ => JpegSampleMode::JpegSampleModeNone, // Default
                 };
             self.sampler.set_sampling_mode(mode);
+
+            self.width = (factor >> 4) as u8 * JPEG_MCU_NUM_PIXELS_DEFAULT;
+            self.height = (factor & 0x0F) as u8 * JPEG_MCU_NUM_PIXELS_DEFAULT;
         }
     }
 
     pub fn dump(&self)
     {
-        for i in 0..self.num_blocks_in_mcu
+        for i in 0..self.num_blocks_in_mcu as usize
         {
             let cid = self.component_ids[i] as usize;
             println!("Block {} (ComponentID={}, TableID={}):", i, cid, self.dht_ids[cid]);
