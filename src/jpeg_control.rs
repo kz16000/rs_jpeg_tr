@@ -156,11 +156,11 @@ impl JpegControl
 
         // Iteration of each MCU decode
         let mut out_pos: usize = 0;
-        let num_iter_x = self.out_buffer_info.get_width() / mcu.get_pixel_width();
-        let num_iter_y = self.out_buffer_info.get_height() / mcu.get_pixel_height();
-        let stride_h = mcu.get_pixel_width() * self.out_buffer_info.get_bpp();
+        let num_iter_x = self.out_buffer_info.get_width() / mcu.get_width();
+        let num_iter_y = self.out_buffer_info.get_height() / mcu.get_height();
+        let stride_h = mcu.get_width() * self.out_buffer_info.get_bpp();
         let stride_v = self.out_buffer_info.get_width() * self.out_buffer_info.get_bpp()
-                     * (mcu.get_pixel_height() - 1);
+                     * (mcu.get_height() - 1);
         bsreader.set_pos(self.img_start, 0);
         for _y in 0..num_iter_y
         {

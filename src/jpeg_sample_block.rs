@@ -233,13 +233,13 @@ impl JpegMinimumCodedUnit
         self.sampler.upsampling(&self.blocks, out_buf, buf_info, pos);
     }
 
-    // Pixel width/height of MCU
-    pub fn get_pixel_width(&self) -> usize
+    // Width/height of MCU in pixels
+    pub fn get_width(&self) -> usize
     {
         self.width as usize
     }
 
-    pub fn get_pixel_height(&self) -> usize
+    pub fn get_height(&self) -> usize
     {
         self.height as usize
     }
