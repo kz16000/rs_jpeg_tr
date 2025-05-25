@@ -5,6 +5,8 @@
 use crate::jpeg_constants::JPEG_MAX_NUM_OF_COMPONENTS;
 use crate::jpeg_raw_data;
 
+const JPEG_MCU_NUM_PIXELS_MIN: usize = 8;
+
 #[derive(Copy)]
 #[derive(Clone)]
 pub struct JpegSamplingFactor
@@ -57,6 +59,16 @@ impl JpegSamplingFactor
     pub fn get_num_blocks(&self) -> usize
     {
         self.get_num_v() * self.get_num_h()
+    }
+
+    pub fn get_num_mcu_pixels_h(&self) -> usize
+    {
+        self.get_num_h() * JPEG_MCU_NUM_PIXELS_MIN
+    }
+
+    pub fn get_num_mcu_pixels_v(&self) -> usize
+    {
+        self.get_num_v() * JPEG_MCU_NUM_PIXELS_MIN
     }
 }
 

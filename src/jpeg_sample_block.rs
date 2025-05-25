@@ -276,8 +276,8 @@ impl JpegMinimumCodedUnit
                 };
             self.sampler.set_sampling_mode(mode);
 
-            self.width = (factor >> 4) as u8 * JPEG_MCU_NUM_PIXELS_DEFAULT;
-            self.height = (factor & 0x0F) as u8 * JPEG_MCU_NUM_PIXELS_DEFAULT;
+            self.width = self.sampling_factor[0].get_num_mcu_pixels_h() as u8;
+            self.height = self.sampling_factor[0].get_num_mcu_pixels_v() as u8;
         }
     }
 

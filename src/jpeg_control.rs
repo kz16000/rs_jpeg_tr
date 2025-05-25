@@ -49,6 +49,12 @@ impl JpegControl
         }
     }
 
+    // Round up + alignment
+    fn round_up(num: usize, base: usize) -> usize
+    {
+        ((num + base - 1) / base) * base
+    }
+
     // ファイル読み込み
     pub fn read_from_file(&mut self, infilename: &String)
     {
@@ -116,7 +122,10 @@ impl JpegControl
             print!("{} {:04x} \n", marker_name, seg_size);
         }
         
-        let (wd, ht) = self.frame_header_info.get_dimension();
+        let (mut wd, mut ht) = self.frame_header_info.get_dimension();
+        let sf = self.frame_header_info.get_sampling_factor(0);
+        wd = Self::round_up(wd, sf.get_num_mcu_pixels_h());
+        ht = Self::round_up(ht, sf.get_num_mcu_pixels_v());
         self.out_buffer_info.set_parameters(wd, ht, 3);
 
         /*
@@ -135,7 +144,7 @@ impl JpegControl
     // Get dimension of the image
     pub fn get_dimension(&self) -> (usize, usize)
     {
-        self.frame_header_info.get_dimension()
+        self.out_buffer_info.get_dimension()
     }
 
     // Decoding image

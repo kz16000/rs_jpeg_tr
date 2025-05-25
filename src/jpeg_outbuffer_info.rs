@@ -44,6 +44,12 @@ impl JpegOutBufferInfo
         self.height as usize
     }
 
+    // Gets width/height
+    pub fn get_dimension(&self) -> (usize, usize)
+    {
+        (self.width as usize, self.height as usize)
+    }
+
     // Gets bpp
     pub fn get_bpp(&self) -> usize
     {
